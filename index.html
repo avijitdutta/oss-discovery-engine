@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Open AI Discovery Engine</title>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#121722; --panel2:#0f141d; --line:#1e2633;
+    --txt:#e6edf6; --mut:#8a98ad; --mut2:#5f6c7e;
+    --acc:#5cc8ff; --acc2:#7c5cff; --gap:#ffb454; --ok:#3fb950; --warn:#f0883e;
+    --chip:#1a2230;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--acc);text-decoration:none}
+  .wrap{max-width:1280px;margin:0 auto;padding:22px 20px 60px}
+  header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:6px}
+  h1{font-size:23px;margin:0;letter-spacing:-.3px}
+  h1 .dot{color:var(--acc)}
+  .sub{color:var(--mut);font-size:13px;margin-top:3px;max-width:640px}
+  .refresh{display:flex;align-items:center;gap:10px}
+  .btn{background:linear-gradient(180deg,#1c2636,#141b27);border:1px solid var(--line);color:var(--txt);
+       padding:9px 14px;border-radius:9px;cursor:pointer;font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px}
+  .btn:hover{border-color:#33425a}
+  .btn:disabled{opacity:.55;cursor:default}
+  .stamp{font-size:12px;color:var(--mut);text-align:right}
+  .stamp b{color:var(--txt);font-weight:600}
+  .badge{font-size:11px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--mut)}
+  .badge.live{color:var(--ok);border-color:#1f3a26}
+  .badge.snap{color:var(--warn);border-color:#3a2c1c}
+
+  /* controls */
+  .controls{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:16px 0}
+  .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  .search{flex:1 1 280px;display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);
+          border-radius:10px;padding:8px 12px}
+  .search input{flex:1;background:none;border:none;color:var(--txt);font-size:14px;outline:none}
+  .ctl{display:flex;flex-direction:column;gap:4px}
+  .ctl label{font-size:11px;color:var(--mut2);text-transform:uppercase;letter-spacing:.4px}
+  select,.slider{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:7px 9px;font-size:13px;outline:none}
+  .slider{padding:0}
+  input[type=range]{accent-color:var(--acc)}
+  .toggle{display:flex;align-items:center;gap:7px;background:var(--chip);border:1px solid var(--line);border-radius:9px;padding:7px 11px;cursor:pointer;user-select:none;font-size:13px}
+  .toggle.on{border-color:var(--gap);color:var(--gap)}
+  .morebtn{background:none;border:1px dashed var(--line);color:var(--mut);border-radius:9px;padding:7px 11px;cursor:pointer;font-size:13px}
+  .filters{display:none;gap:18px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+  .filters.show{display:flex}
+  .fgroup{flex:1 1 220px;min-width:200px}
+  .fgroup h4{margin:0 0 8px;font-size:11px;color:var(--acc2);text-transform:uppercase;letter-spacing:.5px}
+  .fgroup .ctl{margin-bottom:8px}
+  .fgroup select{width:100%}
+
+  /* charts */
+  .charts{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;margin:16px 0}
+  @media(max-width:880px){.charts{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .card h3{margin:0 0 2px;font-size:14px}
+  .card .hint{color:var(--mut);font-size:12px;margin-bottom:10px}
+  .legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:10px;font-size:11.5px;color:var(--mut)}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .dotc{width:9px;height:9px;border-radius:50%}
+  .bar{display:flex;align-items:center;gap:9px;margin:6px 0;font-size:12.5px}
+  .bar .nm{width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--mut)}
+  .bar .track{flex:1;height:9px;background:var(--panel2);border-radius:5px;overflow:hidden}
+  .bar .fill{height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+  .bar .val{width:58px;text-align:right;color:var(--txt);font-variant-numeric:tabular-nums}
+
+  .meta-line{display:flex;justify-content:space-between;align-items:center;margin:6px 2px 12px;color:var(--mut);font-size:13px}
+  .meta-line b{color:var(--txt)}
+
+  /* grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}
+  .proj{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;cursor:pointer;transition:.12s;position:relative}
+  .proj:hover{border-color:#34425b;transform:translateY(-2px)}
+  .proj.gap{border-color:#3a2f17}
+  .proj .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .proj .name{font-weight:700;font-size:15px;letter-spacing:-.2px}
+  .proj .who{color:var(--mut);font-size:12px;margin-top:1px}
+  .radar{font-size:22px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+  .radar small{display:block;font-size:9px;color:var(--mut2);font-weight:600;letter-spacing:.5px;text-align:right}
+  .one{color:#c5d1e0;font-size:13px;margin:9px 0 11px;min-height:38px}
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:11px}
+  .tag{font-size:11px;background:var(--chip);border:1px solid var(--line);color:var(--mut);padding:2px 8px;border-radius:999px}
+  .tag.dom{color:var(--acc)}
+  .gapflag{font-size:10.5px;color:var(--gap);border:1px solid #3a2f17;background:#1d1709;padding:2px 8px;border-radius:999px}
+  .sub3{display:flex;gap:6px}
+  .sub3 .s{flex:1;background:var(--panel2);border-radius:7px;padding:6px 7px;text-align:center}
+  .sub3 .s .n{font-weight:700;font-size:14px;font-variant-numeric:tabular-nums}
+  .sub3 .s .l{font-size:9px;color:var(--mut2);text-transform:uppercase;letter-spacing:.4px}
+  .stars{display:flex;align-items:center;gap:5px;color:var(--gap);font-weight:700;font-size:13px}
+  .foot{display:flex;justify-content:space-between;align-items:center;margin-top:11px;color:var(--mut);font-size:12px}
+
+  /* detail panel */
+  .scrim{position:fixed;inset:0;background:rgba(4,6,10,.62);backdrop-filter:blur(3px);display:none;z-index:40}
+  .scrim.show{display:block}
+  .panel{position:fixed;top:0;right:0;height:100%;width:min(560px,94vw);background:var(--panel);border-left:1px solid var(--line);
+         z-index:50;transform:translateX(100%);transition:.22s;overflow-y:auto;padding:24px}
+  .panel.show{transform:translateX(0)}
+  .panel .x{position:absolute;top:16px;right:18px;font-size:22px;color:var(--mut);cursor:pointer;line-height:1}
+  .panel h2{margin:0 6px 2px 0;font-size:20px}
+  .panel .pwho{color:var(--mut);font-size:13px;margin-bottom:14px}
+  .sketch{background:linear-gradient(180deg,#16203044,#0f141d);border:1px solid #243245;border-left:3px solid var(--acc);
+          border-radius:10px;padding:13px;margin:14px 0;font-size:13.5px;line-height:1.6}
+  .sketch .k{color:var(--acc);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px}
+  .kv{display:grid;grid-template-columns:130px 1fr;gap:7px 12px;font-size:13px;margin:12px 0}
+  .kv dt{color:var(--mut)}
+  .kv dd{margin:0;color:var(--txt)}
+  .note{font-size:12.5px;color:var(--mut);line-height:1.6;margin:6px 0}
+  .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--mut)}
+  .empty{text-align:center;color:var(--mut);padding:50px}
+  .err{color:var(--warn);font-size:12px}
+  footer{margin-top:30px;color:var(--mut2);font-size:12px;line-height:1.7;border-top:1px solid var(--line);padding-top:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Open AI Discovery Engine<span class="dot">.</span></h1>
+      <div class="sub">Fantastic projects built on open / open-weight AI models — scored for reuse, momentum, and how hard they are to rebuild.</div>
+    </div>
+    <div class="refresh">
+      <div class="stamp">
+        <div>Last updated <b id="ts">—</b> <span id="livebadge" class="badge">…</span></div>
+        <div id="count" style="margin-top:3px"></div>
+      </div>
+      <button class="btn" id="refreshBtn" title="Pull fresh GitHub stats (cached server-side to reduce load)">
+        <span id="refIcon">⟳</span> Refresh data
+      </button>
+    </div>
+  </header>
+
+  <div class="controls">
+    <div class="row">
+      <div class="search">
+        <span style="color:var(--mut)">⌕</span>
+        <input id="q" placeholder="Search name, description, rebuild sketch…" />
+      </div>
+      <div class="ctl">
+        <label>Sort by</label>
+        <select id="sort">
+          <option value="radar_score">Radar score</option>
+          <option value="momentum">Momentum</option>
+          <option value="popularity">Popularity</option>
+          <option value="reusability">Reusability</option>
+          <option value="stars">GitHub stars</option>
+        </select>
+      </div>
+      <div class="ctl" style="min-width:170px">
+        <label>Min relevance (radar ≥ <span id="relv">0</span>)</label>
+        <input class="slider" type="range" id="rel" min="0" max="100" value="0" step="5" style="width:170px"/>
+      </div>
+      <div class="ctl">
+        <label>Active within</label>
+        <select id="tw">
+          <option value="100000">Any time</option>
+          <option value="30">Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="180">Last 6 months</option>
+          <option value="365">Last year</option>
+        </select>
+      </div>
+      <div class="toggle" id="gapToggle" title="Proven traction, no business model yet — a layer you could build">◆ Opportunity gaps</div>
+      <button class="morebtn" id="moreBtn">More filters ▾</button>
+    </div>
+    <div class="filters" id="filters"></div>
+  </div>
+
+  <div class="charts">
+    <div class="card">
+      <h3>Momentum vs Popularity</h3>
+      <div class="hint">Bubble size = GitHub stars · color = domain · top-right = hot &amp; established</div>
+      <svg id="scatter" viewBox="0 0 100 70" preserveAspectRatio="none" style="width:100%;height:260px"></svg>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="card">
+      <h3 id="barTitle">Most-starred (filtered)</h3>
+      <div class="hint">Live GitHub stars across the current selection</div>
+      <div id="bars"></div>
+    </div>
+  </div>
+
+  <div class="meta-line">
+    <div>Showing <b id="shown">0</b> projects</div>
+    <div id="rollup"></div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" style="display:none">No projects match these filters.</div>
+
+  <footer>
+    <div><b>Method.</b> Radar = 0.35·popularity + 0.40·momentum + 0.25·reusability, min-max normalized within the batch. Popularity from stars (log); momentum from stars/day + recency + cross-source presence (proxy, not refined); reusability from license, deployment footprint, build complexity and maturity. Curated qualitative fields are hand-authored; <b>Refresh data</b> updates the live numbers and re-scores.</div>
+    <div style="margin-top:6px">Sources: GitHub Search API · r/LocalLLaMA. Server caches results up to 6h to respect rate limits.</div>
+  </footer>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="panel" id="panel"></aside>
+
+<script>
+const SNAPSHOT = {"items": [{"name": "open-webui/open-webui", "url": "https://github.com/open-webui/open-webui", "one_liner": "Self-hosted, ChatGPT-style web UI for Ollama and any OpenAI-compatible API.", "license": "BSD-3-ish(NOASSERTION)", "commercial_ok": true, "industry": "general", "domain": "chat-ui", "function": "chat interface", "purpose": "Give local/self-hosted models a polished multi-user chat front-end", "primary_model": "model-agnostic", "base_models": ["llama-3", "qwen2.5", "mistral", "gemma"], "creator": "Open WebUI", "creator_type": "community", "build_complexity": "week", "complexity_reason": "Svelte front-end + FastAPI backend; single Docker image, RAG and auth built in", "deployment": "local-gpu", "maturity": "battle-tested", "maturity_reason": "Massive adoption, weekly releases, the default Ollama companion in r/LocalLLaMA", "in_production": true, "production_evidence": "De-facto standard UI across self-hosted setups", "business_model": "none-yet", "token_tier": "light", "token_note": "UI layer; cost is whatever model backs it. Pairs with a 7-8B on one 24GB GPU for near-free chat.", "reuse_note": "Easiest high-value reuse: deploy as-is, or lift its OpenAI-compatible proxy + RAG pattern.", "rebuild_sketch": "Rebuild as SvelteKit/Next chat shell talking to an OpenAI-compatible endpoint; add a /rag route that chunks uploads into pgvector. The win is the provider-agnostic proxy + per-user model permissions, not the chat bubbles.", "raw": {"stars": 142309, "stars_in_window": null, "hf_likes": null, "age_days": 988, "pushed_days_ago": 1, "stars_per_day": 144.04}, "popularity": 100, "momentum": 100, "reusability": 80, "radar_score": 95, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": true, "compliance_flag": null, "origin_country": "unknown", "source": ["github", "reddit"]}, {"name": "nomic-ai/gpt4all", "url": "https://github.com/nomic-ai/gpt4all", "one_liner": "Desktop app to download and run local LLMs on any device, commercial-use friendly.", "license": "MIT", "commercial_ok": true, "industry": "general", "domain": "local-llm", "function": "local model runner", "purpose": "One-click local LLM chat for non-technical users", "primary_model": "model-agnostic", "base_models": ["llama-3", "mistral", "nous-hermes"], "creator": "Nomic AI", "creator_type": "company", "build_complexity": "week", "complexity_reason": "C++ llama.cpp core + Qt desktop shell; prebuilt installers", "deployment": "local-cpu", "maturity": "production-ready", "maturity_reason": "Stable installers across OSes; slower release cadence lately", "in_production": false, "production_evidence": null, "business_model": "open-core", "token_tier": "light", "token_note": "CPU-runnable quantized 7B models; effectively free local inference, no GPU required.", "reuse_note": "Reuse the packaging pattern\u2014bundling llama.cpp into a signed desktop installer is the hard part it solves.", "rebuild_sketch": "Wrap llama.cpp (or Ollama) in a Tauri/Electron shell with a model-download manager and GGUF picker. The real value is the cross-OS installer + CPU quantization defaults, not the chat box.", "raw": {"stars": 77374, "stars_in_window": null, "hf_likes": null, "age_days": 1181, "pushed_days_ago": 24, "stars_per_day": 65.52}, "popularity": 89, "momentum": 82, "reusability": 95, "radar_score": 88, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": false, "compliance_flag": null, "origin_country": "US", "source": ["github", "reddit"]}, {"name": "Comfy-Org/ComfyUI", "url": "https://github.com/Comfy-Org/ComfyUI", "one_liner": "Node-graph GUI and backend for diffusion image/video pipelines.", "license": "GPL-3.0", "commercial_ok": true, "industry": "creative", "domain": "vision", "function": "image/video generation", "purpose": "Compose reproducible generative-media pipelines visually", "primary_model": "stable-diffusion", "base_models": ["sdxl", "flux", "sd3", "wan"], "creator": "Comfy Org", "creator_type": "company", "build_complexity": "team-weeks", "complexity_reason": "Custom node graph engine + GPU diffusion runtime + huge extension ecosystem", "deployment": "local-gpu", "maturity": "battle-tested", "maturity_reason": "Industry-standard for SD workflows, daily commits, thousands of community nodes", "in_production": true, "production_evidence": "Used in studios and many hosted generation services", "business_model": "open-core", "token_tier": "heavy", "token_note": "Image/video diffusion is GPU-bound; needs 8-24GB VRAM. Self-host pays off fast vs per-image APIs at volume.", "reuse_note": "Reuse the node-graph + execution-cache idea; the full runtime is a big undertaking.", "rebuild_sketch": "A minimal clone: a JSON graph spec + a topological executor that caches node outputs by input hash, wrapping diffusers pipelines. The killer feature is caching unchanged branches so re-runs are instant\u2014copy that first.", "raw": {"stars": 117624, "stars_in_window": null, "hf_likes": null, "age_days": 1250, "pushed_days_ago": 1, "stars_per_day": 94.1}, "popularity": 96, "momentum": 94, "reusability": 55, "radar_score": 85, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": false, "compliance_flag": "GPL-3.0: copyleft\u2014derivative redistributions must stay open", "origin_country": "US", "source": ["github", "reddit", "huggingface"]}, {"name": "Mintplex-Labs/anything-llm", "url": "https://github.com/Mintplex-Labs/anything-llm", "one_liner": "All-in-one local-first desktop app for private RAG over your own documents.", "license": "MIT", "commercial_ok": true, "industry": "general", "domain": "RAG", "function": "document chat", "purpose": "Private chat-with-your-docs without sending data to the cloud", "primary_model": "model-agnostic", "base_models": ["llama-3", "mistral", "qwen2.5"], "creator": "Mintplex Labs", "creator_type": "company", "build_complexity": "week", "complexity_reason": "Node/React app, pluggable vector DBs and model providers, Docker or desktop", "deployment": "local-gpu", "maturity": "battle-tested", "maturity_reason": "Cited by r/LocalLLaMA as the go-to local RAG app; active releases", "in_production": true, "production_evidence": "Common in privacy-sensitive internal deployments", "business_model": "open-core", "token_tier": "moderate", "token_note": "RAG adds embedding calls; a local 7-8B + local embeddings keeps it near-free on one GPU.", "reuse_note": "Great reference architecture for pluggable providers; fork the connector layer.", "rebuild_sketch": "Rebuild as an Electron app: document ingester -> chunker -> local embeddings -> LanceDB, with a provider abstraction over Ollama/OpenAI. The differentiator is 'workspaces' that scope which docs a thread can see\u2014build that boundary in early.", "raw": {"stars": 61827, "stars_in_window": null, "hf_likes": null, "age_days": 1112, "pushed_days_ago": 1, "stars_per_day": 55.6}, "popularity": 85, "momentum": 80, "reusability": 80, "radar_score": 82, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": false, "compliance_flag": null, "origin_country": "US", "source": ["github", "reddit"]}, {"name": "mudler/LocalAI", "url": "https://github.com/mudler/LocalAI", "one_liner": "Drop-in OpenAI-compatible API server for local LLM, vision, voice and image models.", "license": "MIT", "commercial_ok": true, "industry": "dev-tools", "domain": "inference", "function": "model serving", "purpose": "Replace OpenAI endpoints with a local, self-hosted server", "primary_model": "model-agnostic", "base_models": ["llama-3", "whisper", "stable-diffusion"], "creator": "mudler / community", "creator_type": "community", "build_complexity": "week", "complexity_reason": "Go server with multiple backends; single binary/Docker, no GPU required", "deployment": "local-cpu", "maturity": "battle-tested", "maturity_reason": "Mature OpenAI-compat layer, broad model support, active releases", "in_production": true, "production_evidence": "Self-hosted as an OpenAI replacement in many stacks", "business_model": "none-yet", "token_tier": "light", "token_note": "CPU-capable; the whole point is killing per-token API bills for steady internal load.", "reuse_note": "Reuse directly as infra; or copy its OpenAI-schema shim over llama.cpp.", "rebuild_sketch": "A Go/Python service that implements the OpenAI REST schema and routes /chat, /embeddings, /audio to local backends. The value is exact API compatibility so existing SDKs 'just work'\u2014match the response shapes precisely.", "raw": {"stars": 47001, "stars_in_window": null, "hf_likes": null, "age_days": 1190, "pushed_days_ago": 1, "stars_per_day": 39.5}, "popularity": 80, "momentum": 73, "reusability": 100, "radar_score": 82, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": true, "compliance_flag": null, "origin_country": "Italy", "source": ["github", "reddit"]}, {"name": "langgenius/dify", "url": "https://github.com/langgenius/dify", "one_liner": "Production-ready platform to visually build agentic LLM workflows and apps.", "license": "Apache-2.0(mod)", "commercial_ok": true, "industry": "dev-tools", "domain": "agents", "function": "workflow builder", "purpose": "Let teams build, deploy and operate LLM apps without deep code", "primary_model": "model-agnostic", "base_models": ["gpt-4o", "llama-3", "qwen2.5", "claude"], "creator": "LangGenius", "creator_type": "company", "build_complexity": "team-weeks", "complexity_reason": "Large monorepo, Docker-compose stack with API, worker, web, vector DB", "deployment": "cloud-cluster", "maturity": "battle-tested", "maturity_reason": "Frequent releases, huge community, hosted cloud + many enterprise deployments", "in_production": true, "production_evidence": "Widely self-hosted; vendor runs Dify Cloud", "business_model": "open-core", "token_tier": "moderate", "token_note": "Orchestrator only; cost tracks whichever model you wire in. Self-host the runtime, pay per-model.", "reuse_note": "Don't rebuild the whole thing\u2014fork a workflow node or embed via API. The full stack is heavy.", "rebuild_sketch": "To rebuild a slim version: Next.js canvas + a DAG executor in Python (FastAPI), nodes as typed functions, pgvector for retrieval. The trick is the visual node graph compiling to an execution plan; swap in any model behind a provider interface.", "raw": {"stars": 145874, "stars_in_window": null, "hf_likes": null, "age_days": 1165, "pushed_days_ago": 1, "stars_per_day": 125.21}, "popularity": 100, "momentum": 97, "reusability": 15, "radar_score": 78, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": false, "compliance_flag": "Open-source license with an enterprise clause restricting multi-tenant resale", "origin_country": "China", "source": ["github", "reddit"]}, {"name": "ItzCrazyKns/Perplexica", "url": "https://github.com/ItzCrazyKns/Perplexica", "one_liner": "Open-source AI answer engine\u2014a self-hosted Perplexity alternative.", "license": "MIT", "commercial_ok": true, "industry": "general", "domain": "search", "function": "answer engine", "purpose": "Cited, web-grounded answers you can self-host", "primary_model": "model-agnostic", "base_models": ["llama-3", "qwen2.5"], "creator": "ItzCrazyKns", "creator_type": "solo", "build_complexity": "weekend", "complexity_reason": "Next.js app + SearxNG for search + any local model; small surface area", "deployment": "local-gpu", "maturity": "production-ready", "maturity_reason": "Popular Perplexity clone, steady releases, simple to stand up", "in_production": false, "production_evidence": null, "business_model": "none-yet", "token_tier": "moderate", "token_note": "Search + summarize per query; local 8B keeps it cheap, scales with query volume.", "reuse_note": "Excellent weekend rebuild target\u2014small, legible, swappable search backend.", "rebuild_sketch": "Pair SearxNG (or Tavily) with a local model: fetch top results, chunk+rerank, then a grounded-answer prompt that emits inline citations. The whole trick is rerank-then-cite; keep the search provider behind one interface.", "raw": {"stars": 35372, "stars_in_window": null, "hf_likes": null, "age_days": 802, "pushed_days_ago": 70, "stars_per_day": 44.1}, "popularity": 75, "momentum": 70, "reusability": 96, "radar_score": 78, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": true, "compliance_flag": null, "origin_country": "unknown", "source": ["github", "reddit"]}, {"name": "janhq/jan", "url": "https://github.com/janhq/jan", "one_liner": "Open-source ChatGPT alternative that runs 100% offline on your computer.", "license": "Apache-2.0(NOASSERTION)", "commercial_ok": true, "industry": "general", "domain": "local-llm", "function": "offline assistant", "purpose": "A private, offline desktop assistant for everyday use", "primary_model": "model-agnostic", "base_models": ["llama-3", "qwen2.5", "mistral"], "creator": "Menlo / Jan", "creator_type": "company", "build_complexity": "week", "complexity_reason": "Tauri/React desktop app with a local inference engine (Cortex)", "deployment": "local-gpu", "maturity": "production-ready", "maturity_reason": "Polished installers, active roadmap, growing mindshare as Jan", "in_production": false, "production_evidence": null, "business_model": "open-core", "token_tier": "light", "token_note": "Local-first; runs quantized 7-8B free on a laptop GPU, optional cloud BYO key.", "reuse_note": "Clean reference for a Tauri local-AI app with its own inference engine.", "rebuild_sketch": "Tauri shell + a bundled inference engine (Cortex/llama.cpp) + a thread/store model in SQLite. The differentiator is treating the local engine as a first-class managed service inside the app, with model auto-download.", "raw": {"stars": 43090, "stars_in_window": null, "hf_likes": null, "age_days": 1038, "pushed_days_ago": 1, "stars_per_day": 41.51}, "popularity": 78, "momentum": 74, "reusability": 75, "radar_score": 76, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": false, "compliance_flag": null, "origin_country": "Singapore", "source": ["github", "reddit"]}, {"name": "Cinnamon/kotaemon", "url": "https://github.com/Cinnamon/kotaemon", "one_liner": "Clean, open-source RAG UI for chatting with your documents.", "license": "Apache-2.0", "commercial_ok": true, "industry": "general", "domain": "RAG", "function": "document chat", "purpose": "A customizable, good-looking chat-with-docs app for end users", "primary_model": "model-agnostic", "base_models": ["llama-3", "qwen2.5", "gpt-4o"], "creator": "Cinnamon AI", "creator_type": "company", "build_complexity": "weekend", "complexity_reason": "Python/Gradio app, pluggable LLM+embeddings, multi-user, hybrid retrieval", "deployment": "local-gpu", "maturity": "production-ready", "maturity_reason": "Well-documented, clean architecture, steady releases", "in_production": false, "production_evidence": null, "business_model": "none-yet", "token_tier": "moderate", "token_note": "Local model + embeddings; cheap for personal/team doc sets on one GPU.", "reuse_note": "One of the best clean RAG starting points to fork and brand.", "rebuild_sketch": "Gradio UI over a retrieval pipeline with hybrid (BM25+vector) search and a reranker, providers behind interfaces. The standout is multi-user doc collections + citation highlighting; build the citation-to-source mapping early.", "raw": {"stars": 25473, "stars_in_window": null, "hf_likes": null, "age_days": 817, "pushed_days_ago": 11, "stars_per_day": 31.18}, "popularity": 69, "momentum": 65, "reusability": 96, "radar_score": 74, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": true, "compliance_flag": null, "origin_country": "Japan", "source": ["github"]}, {"name": "Fosowl/agenticSeek", "url": "https://github.com/Fosowl/agenticSeek", "one_liner": "Fully local 'Manus' alternative: an autonomous agent that browses, codes and plans\u2014no APIs.", "license": "GPL-3.0", "commercial_ok": true, "industry": "general", "domain": "agents", "function": "local autonomous agent", "purpose": "Run a capable autonomous assistant entirely offline", "primary_model": "model-agnostic", "base_models": ["deepseek", "qwen2.5", "llama-3"], "creator": "Fosowl", "creator_type": "solo", "build_complexity": "week", "complexity_reason": "Python agent with browser automation + local model routing", "deployment": "local-gpu", "maturity": "beta", "maturity_reason": "Hot, fast-moving project; still rough edges, rapid releases", "in_production": false, "production_evidence": null, "business_model": "none-yet", "token_tier": "heavy", "token_note": "Agentic loops are token-heavy by design; running fully local is the whole value prop.", "reuse_note": "Reference for wiring browser+code tools to a local model with no cloud calls.", "rebuild_sketch": "Compose a local model with a tool router over a headless browser and a code sandbox; add a planner that picks a 'fast' vs 'reasoning' local model per step. The differentiator is zero external APIs\u2014design the tool layer to never need a cloud key.", "raw": {"stars": 26537, "stars_in_window": null, "hf_likes": null, "age_days": 486, "pushed_days_ago": 10, "stars_per_day": 54.6}, "popularity": 69, "momentum": 79, "reusability": 65, "radar_score": 72, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": true, "compliance_flag": "GPL-3.0: copyleft", "origin_country": "France", "source": ["github", "reddit"]}, {"name": "lllyasviel/Fooocus", "url": "https://github.com/lllyasviel/Fooocus", "one_liner": "Focus-on-prompting image generator that hides Stable Diffusion's complexity.", "license": "GPL-3.0", "commercial_ok": true, "industry": "creative", "domain": "vision", "function": "image generation", "purpose": "Midjourney-simple local image generation", "primary_model": "stable-diffusion", "base_models": ["sdxl"], "creator": "lllyasviel", "creator_type": "solo", "build_complexity": "week", "complexity_reason": "Python app wrapping SDXL with auto prompt/parameter tuning", "deployment": "local-gpu", "maturity": "production-ready", "maturity_reason": "Hugely popular, stable; updates have slowed (~7 months since push)", "in_production": false, "production_evidence": null, "business_model": "none-yet", "token_tier": "heavy", "token_note": "SDXL needs ~8GB+ VRAM; free locally, cheaper than per-image APIs once you own a GPU.", "reuse_note": "Study its opinionated defaults\u2014the 'just type a prompt' UX is the product.", "rebuild_sketch": "Wrap diffusers SDXL with quality presets and automatic negative-prompt + sampler selection so users only type a prompt. The defining trick is hidden parameter optimization; encode tasteful defaults rather than exposing 40 sliders.", "raw": {"stars": 50382, "stars_in_window": null, "hf_likes": null, "age_days": 1046, "pushed_days_ago": 201, "stars_per_day": 48.17}, "popularity": 81, "momentum": 64, "reusability": 75, "radar_score": 72, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": true, "compliance_flag": "GPL-3.0: copyleft", "origin_country": "US", "source": ["github", "reddit"]}, {"name": "CherryHQ/cherry-studio", "url": "https://github.com/CherryHQ/cherry-studio", "one_liner": "Cross-platform desktop AI studio: chat, agents and 300+ prebuilt assistants.", "license": "AGPL-3.0", "commercial_ok": false, "industry": "general", "domain": "chat-ui", "function": "multi-model client", "purpose": "One desktop client to use many local & cloud models with agents", "primary_model": "model-agnostic", "base_models": ["qwen2.5", "llama-3", "deepseek", "gpt-4o"], "creator": "Cherry Studio", "creator_type": "company", "build_complexity": "week", "complexity_reason": "Electron + Vue client wrapping many provider SDKs", "deployment": "local-gpu", "maturity": "production-ready", "maturity_reason": "Fast-growing, frequent releases, large assistant marketplace", "in_production": false, "production_evidence": null, "business_model": "none-yet", "token_tier": "light", "token_note": "Client app; cost is the backing model. Use local models for free, BYO API key for frontier.", "reuse_note": "AGPL limits closed forks\u2014reuse ideas, not code, if you plan to sell.", "rebuild_sketch": "Electron + a provider registry where each model is a plugin exposing a common chat/stream interface; assistants are just system-prompt+tool bundles in JSON. The trick is a clean assistant-as-config format users can share.", "raw": {"stars": 47561, "stars_in_window": null, "hf_likes": null, "age_days": 757, "pushed_days_ago": 1, "stars_per_day": 62.83}, "popularity": 80, "momentum": 83, "reusability": 30, "radar_score": 68, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": true, "compliance_flag": "AGPL-3.0: strong copyleft, gates closed-source commercial forks", "origin_country": "China", "source": ["github", "reddit"]}, {"name": "assafelovic/gpt-researcher", "url": "https://github.com/assafelovic/gpt-researcher", "one_liner": "Autonomous agent that runs multi-source deep research and writes cited reports.", "license": "Apache-2.0", "commercial_ok": true, "industry": "research", "domain": "agents", "function": "deep research", "purpose": "Turn a question into a sourced research report automatically", "primary_model": "model-agnostic", "base_models": ["gpt-4o", "llama-3", "qwen2.5"], "creator": "Assaf Elovic", "creator_type": "solo", "build_complexity": "weekend", "complexity_reason": "Python agent: planner + parallel web search + writer; modest code size", "deployment": "api-dependent", "maturity": "production-ready", "maturity_reason": "Widely forked research agent, steady releases, good docs", "in_production": false, "production_evidence": null, "business_model": "none-yet", "token_tier": "heavy", "token_note": "Reads many sources per run\u2014token-hungry; a local long-context model cuts cost sharply.", "reuse_note": "Clean, copyable blueprint for plan->search->synthesize report agents.", "rebuild_sketch": "A planner that decomposes the query into sub-questions, fans out parallel web searches, dedupes+ranks sources, then a writer with citation tracking. The reusable trick is parallel sub-question research with a shared evidence store; swap the search and model providers.", "raw": {"stars": 27795, "stars_in_window": null, "hf_likes": null, "age_days": 1135, "pushed_days_ago": 23, "stars_per_day": 24.49}, "popularity": 70, "momentum": 61, "reusability": 71, "radar_score": 67, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": true, "compliance_flag": null, "origin_country": "Israel", "source": ["github", "reddit"]}, {"name": "chatchat-space/Langchain-Chatchat", "url": "https://github.com/chatchat-space/Langchain-Chatchat", "one_liner": "Local-knowledge RAG and agent app built on Langchain with ChatGLM/Qwen/Llama.", "license": "Apache-2.0", "commercial_ok": true, "industry": "general", "domain": "RAG", "function": "knowledge base QA", "purpose": "Offline document QA for Chinese & multilingual enterprises", "primary_model": "qwen2.5", "base_models": ["qwen2.5", "chatglm", "llama-3"], "creator": "chatchat-space", "creator_type": "community", "build_complexity": "week", "complexity_reason": "Python app, Langchain + a vector store + Streamlit/FastAPI UI", "deployment": "local-gpu", "maturity": "production-ready", "maturity_reason": "Long-running project, big install base; commits have slowed (~7 months since push)", "in_production": true, "production_evidence": "Adopted across Chinese enterprises for offline KB QA", "business_model": "none-yet", "token_tier": "moderate", "token_note": "Local Qwen + local embeddings; runs free on one GPU for typical KB sizes.", "reuse_note": "A solid Langchain RAG reference, but newer stacks (kotaemon) are leaner.", "rebuild_sketch": "Rebuild on LlamaIndex instead of Langchain: ingest -> embed -> FAISS/Milvus -> a Qwen reader, with a Streamlit chat. The lesson is its agent+KB blend; keep retrieval and tool-use as separate, swappable stages.", "raw": {"stars": 38195, "stars_in_window": null, "hf_likes": null, "age_days": 1177, "pushed_days_ago": 222, "stars_per_day": 32.45}, "popularity": 76, "momentum": 51, "reusability": 75, "radar_score": 66, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": false, "compliance_flag": null, "origin_country": "China", "source": ["github"]}, {"name": "oobabooga/text-generation-webui", "url": "https://github.com/oobabooga/text-generation-webui", "one_liner": "Power-user desktop/web app for running local LLMs with tools and an OpenAI-compatible API.", "license": "AGPL-3.0", "commercial_ok": false, "industry": "general", "domain": "local-llm", "function": "local model runner", "purpose": "Flexible backend+UI for experimenting with local text models", "primary_model": "model-agnostic", "base_models": ["llama-3", "mistral", "qwen2.5"], "creator": "oobabooga", "creator_type": "solo", "build_complexity": "week", "complexity_reason": "Python Gradio app with multiple loader backends (llama.cpp, exllama, transformers)", "deployment": "local-gpu", "maturity": "battle-tested", "maturity_reason": "Long-standing r/LocalLLaMA staple, multi-backend, steady releases", "in_production": false, "production_evidence": null, "business_model": "none-yet", "token_tier": "moderate", "token_note": "Runs quantized models on consumer GPUs; cost is electricity once weights are local.", "reuse_note": "Best mined for its multi-loader abstraction (one UI, many inference backends).", "rebuild_sketch": "Build a thin Gradio/Streamlit front-end over a loader interface that can swap llama.cpp / vLLM / transformers behind one generate() call. The reusable insight is normalizing sampler params across backends.", "raw": {"stars": 47340, "stars_in_window": null, "hf_likes": null, "age_days": 1277, "pushed_days_ago": 18, "stars_per_day": 37.07}, "popularity": 80, "momentum": 70, "reusability": 35, "radar_score": 65, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": true, "compliance_flag": "AGPL-3.0: network-use copyleft", "origin_country": "unknown", "source": ["github", "reddit"]}, {"name": "Zackriya-Solutions/meetily", "url": "https://github.com/Zackriya-Solutions/meetily", "one_liner": "Privacy-first local meeting assistant with fast Whisper/Parakeet transcription and summaries.", "license": "MIT", "commercial_ok": true, "industry": "productivity", "domain": "voice", "function": "meeting notes", "purpose": "Transcribe and summarize meetings without sending audio to the cloud", "primary_model": "whisper", "base_models": ["whisper", "parakeet", "llama-3"], "creator": "Zackriya Solutions", "creator_type": "company", "build_complexity": "week", "complexity_reason": "Desktop app capturing audio + local Whisper + a summarizer model", "deployment": "local-gpu", "maturity": "beta", "maturity_reason": "Fast-growing, active, still maturing feature set", "in_production": false, "production_evidence": null, "business_model": "none-yet", "token_tier": "moderate", "token_note": "Whisper is cheap locally; a small summarizer keeps the whole pipeline near-free.", "reuse_note": "Strong rebuild target\u2014clear value, modest scope, privacy angle sells.", "rebuild_sketch": "Capture system+mic audio, stream into faster-whisper for live transcription, then a local model for rolling summaries and action items. The trick is real-time chunked transcription + speaker diarization; nail low-latency streaming first.", "raw": {"stars": 12814, "stars_in_window": null, "hf_likes": null, "age_days": 541, "pushed_days_ago": 15, "stars_per_day": 23.69}, "popularity": 56, "momentum": 61, "reusability": 65, "radar_score": 61, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": true, "compliance_flag": null, "origin_country": "India", "source": ["github", "reddit"]}, {"name": "facefusion/facefusion", "url": "https://github.com/facefusion/facefusion", "one_liner": "Industry-leading face-swap and face-manipulation platform.", "license": "custom(NOASSERTION)", "commercial_ok": false, "industry": "creative", "domain": "vision", "function": "face manipulation", "purpose": "High-quality face swapping for media production", "primary_model": "inswapper", "base_models": ["inswapper", "gfpgan"], "creator": "FaceFusion", "creator_type": "community", "build_complexity": "week", "complexity_reason": "Python pipeline over ONNX face models + ffmpeg; GPU recommended", "deployment": "local-gpu", "maturity": "battle-tested", "maturity_reason": "Leading face-swap tool, very active, broad model support", "in_production": true, "production_evidence": "Used in content/VFX pipelines", "business_model": "none-yet", "token_tier": "heavy", "token_note": "GPU-bound video processing; cost is compute time, not tokens.", "reuse_note": "Technically clean, but consent/likeness rules make commercial reuse sensitive.", "rebuild_sketch": "Chain a face detector -> embedding -> swapper (inswapper) -> face restorer (GFPGAN) over ffmpeg frames. The quality lever is temporal consistency across frames; add face-tracking + blending rather than per-frame swaps. Build consent/watermark guardrails in from day one.", "raw": {"stars": 28981, "stars_in_window": null, "hf_likes": null, "age_days": 1038, "pushed_days_ago": 1, "stars_per_day": 27.92}, "popularity": 71, "momentum": 63, "reusability": 35, "radar_score": 59, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": true, "compliance_flag": "Custom license restricts misuse; deepfake/consent and likeness laws apply", "origin_country": "unknown", "source": ["github"]}, {"name": "khoj-ai/khoj", "url": "https://github.com/khoj-ai/khoj", "one_liner": "Self-hostable 'AI second brain' that answers from your docs and the web with custom agents.", "license": "AGPL-3.0", "commercial_ok": false, "industry": "productivity", "domain": "RAG", "function": "personal knowledge agent", "purpose": "Search and reason over your notes, docs and the web", "primary_model": "model-agnostic", "base_models": ["llama-3", "qwen2.5", "gpt-4o"], "creator": "Khoj", "creator_type": "company", "build_complexity": "week", "complexity_reason": "Django backend, multiple clients (Obsidian, Emacs, web), vector search", "deployment": "local-gpu", "maturity": "production-ready", "maturity_reason": "Mature multi-client product with hosted cloud tier and steady releases", "in_production": true, "production_evidence": "Vendor operates Khoj Cloud", "business_model": "open-core", "token_tier": "moderate", "token_note": "Indexes a personal corpus; local model + embeddings keep recurring cost near zero.", "reuse_note": "Good reference for multi-client (editor plugins) sync over one RAG backend.", "rebuild_sketch": "One ingestion/embedding backend exposing a search+chat API, with thin clients (Obsidian plugin, web). The differentiator is continuous sync of personal sources; build incremental re-indexing on file change first.", "raw": {"stars": 35212, "stars_in_window": null, "hf_likes": null, "age_days": 1769, "pushed_days_ago": 86, "stars_per_day": 19.91}, "popularity": 75, "momentum": 53, "reusability": 30, "radar_score": 55, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": false, "compliance_flag": "AGPL-3.0: network copyleft; commercial cloud tier offered separately", "origin_country": "US", "source": ["github", "reddit"]}, {"name": "reworkd/AgentGPT", "url": "https://github.com/reworkd/AgentGPT", "one_liner": "Configure and deploy autonomous AI agents straight from your browser.", "license": "GPL-3.0", "commercial_ok": true, "industry": "dev-tools", "domain": "agents", "function": "autonomous task agent", "purpose": "Let anyone spin up a goal-driven agent in the browser", "primary_model": "gpt-4o", "base_models": ["gpt-4o", "llama-3"], "creator": "Reworkd", "creator_type": "company", "build_complexity": "week", "complexity_reason": "Next.js + FastAPI, agent loop over a model + tools", "deployment": "api-dependent", "maturity": "beta", "maturity_reason": "Famous early-wave agent demo; maintenance has largely stalled (~14 months idle)", "in_production": false, "production_evidence": null, "business_model": "none-yet", "token_tier": "heavy", "token_note": "Autonomous loops burn tokens fast; a local 8-70B keeps runaway agent costs bounded.", "reuse_note": "Historical reference for the plan->act->observe loop; code is dated now.", "rebuild_sketch": "Rebuild the agent loop with a modern tool-calling model: a task queue, a tool registry, and a reflection step that prunes failed branches. Swap the brittle JSON-parsing for native tool calls and cap step budgets to avoid token blowups.", "raw": {"stars": 36209, "stars_in_window": null, "hf_likes": null, "age_days": 1170, "pushed_days_ago": 417, "stars_per_day": 30.95}, "popularity": 75, "momentum": 43, "reusability": 40, "radar_score": 54, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": false, "compliance_flag": "GPL-3.0: copyleft", "origin_country": "US", "source": ["github", "reddit"]}, {"name": "onyx-dot-app/onyx", "url": "https://github.com/onyx-dot-app/onyx", "one_liner": "Open-source AI chat platform with enterprise connectors that works with any LLM.", "license": "MIT(modified)", "commercial_ok": true, "industry": "enterprise", "domain": "RAG", "function": "enterprise search/chat", "purpose": "Unified AI chat over a company's knowledge and tools", "primary_model": "model-agnostic", "base_models": ["llama-3", "gpt-4o", "qwen2.5"], "creator": "Onyx (ex-Danswer)", "creator_type": "company", "build_complexity": "team-weeks", "complexity_reason": "Multi-service stack: connectors, indexing, vector DB, web app", "deployment": "cloud-cluster", "maturity": "battle-tested", "maturity_reason": "Mature (formerly Danswer), many connectors, active enterprise use", "in_production": true, "production_evidence": "Deployed as internal knowledge assistant in companies", "business_model": "open-core", "token_tier": "moderate", "token_note": "Enterprise RAG; local model keeps sensitive-data inference in-house and cheap at scale.", "reuse_note": "Mine the connector framework\u201440+ source integrations is the moat, not the chat.", "rebuild_sketch": "Build a connector SDK (each source -> normalized documents) feeding a shared indexer + pgvector, with an OpenAI-compatible chat over retrieval. The hard, valuable part is incremental connector sync with permissions\u2014start there.", "raw": {"stars": 30439, "stars_in_window": null, "hf_likes": null, "age_days": 1150, "pushed_days_ago": 1, "stars_per_day": 26.47}, "popularity": 72, "momentum": 62, "reusability": 15, "radar_score": 54, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": false, "compliance_flag": "Mostly MIT with some enterprise-only modules", "origin_country": "US", "source": ["github"]}, {"name": "langbot-app/LangBot", "url": "https://github.com/langbot-app/LangBot", "one_liner": "Production platform for building agentic IM bots across many chat platforms.", "license": "Apache-2.0", "commercial_ok": true, "industry": "dev-tools", "domain": "agents", "function": "chatbot platform", "purpose": "Deploy LLM agents into WhatsApp/Telegram/Discord/etc.", "primary_model": "model-agnostic", "base_models": ["qwen2.5", "gpt-4o", "deepseek"], "creator": "LangBot", "creator_type": "community", "build_complexity": "week", "complexity_reason": "Python platform with per-IM adapters + plugin/knowledge orchestration", "deployment": "api-dependent", "maturity": "production-ready", "maturity_reason": "Long-running, broad platform support, active releases", "in_production": true, "production_evidence": "Used to run customer-facing IM bots", "business_model": "open-core", "token_tier": "light", "token_note": "Chat-burst workload; a local 7-8B handles most IM traffic cheaply.", "reuse_note": "Reuse the IM-adapter abstraction\u2014normalizing many chat platforms is the grind.", "rebuild_sketch": "Build a message bus where each IM platform is an adapter emitting a normalized event, routed to an agent runtime with plugins. The reusable core is the adapter interface + a knowledge/plugin registry; start with one platform, design for many.", "raw": {"stars": 16368, "stars_in_window": null, "hf_likes": null, "age_days": 1291, "pushed_days_ago": 1, "stars_per_day": 12.68}, "popularity": 61, "momentum": 47, "reusability": 50, "radar_score": 53, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": false, "compliance_flag": null, "origin_country": "China", "source": ["github"]}, {"name": "Tencent/WeKnora", "url": "https://github.com/Tencent/WeKnora", "one_liner": "Open-source LLM knowledge platform turning raw documents into a queryable RAG.", "license": "custom(NOASSERTION)", "commercial_ok": true, "industry": "enterprise", "domain": "RAG", "function": "knowledge platform", "purpose": "Stand up document-grounded reasoning for enterprises", "primary_model": "model-agnostic", "base_models": ["qwen2.5", "deepseek"], "creator": "Tencent", "creator_type": "company", "build_complexity": "team-weeks", "complexity_reason": "Multi-service platform: ingestion, retrieval, reasoning, API", "deployment": "cloud-cluster", "maturity": "beta", "maturity_reason": "New (2025) but backed by Tencent, very active, fast traction", "in_production": false, "production_evidence": null, "business_model": "open-core", "token_tier": "moderate", "token_note": "Self-host with Qwen/DeepSeek to keep enterprise data and cost in-house.", "reuse_note": "Big-vendor RAG reference; license review needed for commercial forks.", "rebuild_sketch": "A pipeline that turns docs into a hybrid index + a reasoning layer that plans multi-hop retrieval. The interesting part is autonomous multi-step retrieval over a knowledge graph; prototype the planner before the UI.", "raw": {"stars": 16493, "stars_in_window": null, "hf_likes": null, "age_days": 333, "pushed_days_ago": 2, "stars_per_day": 49.53}, "popularity": 61, "momentum": 75, "reusability": 0, "radar_score": 51, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": false, "compliance_flag": "Tencent custom license\u2014review terms before commercial redistribution", "origin_country": "China", "source": ["github"]}, {"name": "h2oai/h2ogpt", "url": "https://github.com/h2oai/h2ogpt", "one_liner": "100% private chat with local models over documents, images and video.", "license": "Apache-2.0", "commercial_ok": true, "industry": "enterprise", "domain": "RAG", "function": "private document chat", "purpose": "Enterprise-grade private RAG with permissive licensing", "primary_model": "model-agnostic", "base_models": ["llama-3", "mistral", "h2o-danube"], "creator": "H2O.ai", "creator_type": "company", "build_complexity": "week", "complexity_reason": "Python app, many loaders + Gradio UI; Apache-2.0 throughout", "deployment": "local-gpu", "maturity": "production-ready", "maturity_reason": "Backed by H2O.ai, enterprise focus; release cadence has slowed", "in_production": true, "production_evidence": "Used in regulated enterprises for private RAG", "business_model": "enterprise-services", "token_tier": "moderate", "token_note": "Local models + Apache licensing make it cheap and safe for regulated commercial use.", "reuse_note": "Notable mainly for fully-permissive licensing end-to-end\u2014safe to commercialize.", "rebuild_sketch": "A document+media ingester feeding a local model with a Gradio UI and an OpenAI-compatible API. The differentiator is multimodal RAG (image/video frames as retrievable chunks); build the media-to-text extraction layer first.", "raw": {"stars": 11982, "stars_in_window": null, "hf_likes": null, "age_days": 1184, "pushed_days_ago": 254, "stars_per_day": 10.12}, "popularity": 55, "momentum": 26, "reusability": 75, "radar_score": 48, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": false, "compliance_flag": null, "origin_country": "US", "source": ["github"]}, {"name": "theaiautomators/insights-lm-public", "url": "https://github.com/theaiautomators/insights-lm-public", "one_liner": "Self-hosted NotebookLM alternative: chat with docs and generate audio summaries.", "license": "MIT", "commercial_ok": true, "industry": "productivity", "domain": "RAG", "function": "notebook assistant", "purpose": "A private NotebookLM-style research notebook you control", "primary_model": "model-agnostic", "base_models": ["llama-3", "whisper"], "creator": "The AI Automators", "creator_type": "community", "build_complexity": "weekend", "complexity_reason": "Supabase + n8n + a front-end; low-code wiring, small footprint", "deployment": "api-dependent", "maturity": "experiment", "maturity_reason": "Young repo, modest stars, low-code template more than a product", "in_production": false, "production_evidence": null, "business_model": "none-yet", "token_tier": "moderate", "token_note": "Audio overviews add TTS cost; local TTS + model keeps it affordable.", "reuse_note": "Lightweight template\u2014ideal to fork into a branded NotebookLM clone.", "rebuild_sketch": "Ingest docs to a vector store, add a grounded chat, then a 'podcast' step: a 2-host dialogue script -> local TTS. The standout feature is audio overviews; the dialogue-script prompt + TTS stitching is the part worth copying.", "raw": {"stars": 548, "stars_in_window": null, "hf_likes": null, "age_days": 379, "pushed_days_ago": 155, "stars_per_day": 1.45}, "popularity": 0, "momentum": 0, "reusability": 51, "radar_score": 13, "popularity_estimated": false, "momentum_unrefined": true, "opportunity_gap": false, "compliance_flag": null, "origin_country": "unknown", "source": ["github"]}], "meta": {"window": "All-time hot (high-traction + currently active), scanned Jun 2026", "sources_used": ["GitHub Search API", "r/LocalLLaMA (web)", "web search"], "sources_unreachable": ["Hugging Face API (host blocked in sandbox)", "Hacker News Algolia (not queried this run)"], "focus": "Apps people build on open/open-weight models", "generated": "2026-06-20", "scoring_note": "Momentum is proxy-based (stars/day + recency + cross-source); no GitHub token, so stars_in_window unrefined.", "live": false, "count": 24}};
+let DATA = [];      // current items
+let META = {};
+const DOMAIN_COLORS = {};
+const PALETTE = ["#5cc8ff","#7c5cff","#3fb950","#ffb454","#f778ba","#56d4dd","#e3b341","#ff7b72","#a5d6ff","#d2a8ff","#7ee787","#ffa657"];
+
+const $ = s => document.querySelector(s);
+const fmtStars = n => n>=1000 ? (n/1000).toFixed(n>=10000?0:1)+"k" : (n||0);
+function relTime(iso){
+  if(!iso) return "—";
+  const s=(Date.now()-new Date(iso).getTime())/1000;
+  if(s<90) return "just now";
+  if(s<3600) return Math.round(s/60)+"m ago";
+  if(s<86400) return Math.round(s/3600)+"h ago";
+  return Math.round(s/86400)+"d ago";
+}
+
+const FILTER_AXES = [
+  {group:"What it is", keys:[["domain","Domain"],["industry","Industry"],["function","Function"]]},
+  {group:"Can I build it", keys:[["primary_model","Primary model"],["build_complexity","Build effort"],["deployment","Deployment"],["maturity","Maturity"],["token_tier","Token cost"]]},
+  {group:"Can I use it", keys:[["license","License"],["business_model","Business model"],["origin_country","Origin"]]},
+];
+const active = {}; // key -> value
+
+function buildFilters(){
+  const host = $("#filters"); host.innerHTML="";
+  for(const sec of FILTER_AXES){
+    const g=document.createElement("div"); g.className="fgroup";
+    g.innerHTML=`<h4>${sec.group}</h4>`;
+    for(const [key,label] of sec.keys){
+      const vals=[...new Set(DATA.map(d=>d[key]).filter(Boolean))].sort();
+      const c=document.createElement("div"); c.className="ctl";
+      const sel=document.createElement("select"); sel.dataset.key=key;
+      sel.innerHTML=`<option value="">All ${label.toLowerCase()}</option>`+vals.map(v=>`<option>${v}</option>`).join("");
+      sel.onchange=()=>{ if(sel.value) active[key]=sel.value; else delete active[key]; render(); };
+      c.innerHTML=`<label>${label}</label>`; c.appendChild(sel); g.appendChild(c);
+    }
+    host.appendChild(g);
+  }
+}
+
+let gapOnly=false;
+function filtered(){
+  const q=$("#q").value.trim().toLowerCase();
+  const rel=+$("#rel").value;
+  const tw=+$("#tw").value;
+  return DATA.filter(d=>{
+    if(d.radar_score<rel) return false;
+    if(gapOnly && !d.opportunity_gap) return false;
+    if((d.raw?.pushed_days_ago ?? 0) > tw) return false;
+    for(const k in active){ if(d[k]!==active[k]) return false; }
+    if(q){
+      const hay=(d.name+" "+d.one_liner+" "+(d.rebuild_sketch||"")+" "+(d.domain||"")+" "+(d.primary_model||"")).toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function assignColors(){
+  const doms=[...new Set(DATA.map(d=>d.domain))].sort();
+  doms.forEach((d,i)=>DOMAIN_COLORS[d]=PALETTE[i%PALETTE.length]);
+}
+
+function drawScatter(items){
+  const svg=$("#scatter"); const W=100,H=70,pad=4;
+  const maxStars=Math.max(...items.map(d=>d.raw?.stars||1),1);
+  let s=`<line x1="${pad}" y1="${H-pad}" x2="${W-pad}" y2="${H-pad}" stroke="#1e2633" stroke-width=".4"/>
+         <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${H-pad}" stroke="#1e2633" stroke-width=".4"/>`;
+  for(const d of items){
+    const x=pad+(d.momentum/100)*(W-2*pad);
+    const y=(H-pad)-(d.popularity/100)*(H-2*pad);
+    const r=1.1+Math.sqrt((d.raw?.stars||1)/maxStars)*4.2;
+    const c=DOMAIN_COLORS[d.domain]||"#8a98ad";
+    s+=`<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="${r.toFixed(2)}" fill="${c}" fill-opacity="${d.opportunity_gap?.9:.6}" stroke="${d.opportunity_gap?'#ffb454':c}" stroke-width="${d.opportunity_gap?.5:.2}"><title>${d.name} · ${fmtStars(d.raw?.stars)}★ · mom ${d.momentum} · pop ${d.popularity}</title></circle>`;
+  }
+  s+=`<text x="${W-pad}" y="${H-1}" font-size="2.6" fill="#5f6c7e" text-anchor="end">momentum →</text>
+      <text x="1.5" y="${pad+1}" font-size="2.6" fill="#5f6c7e">↑ popularity</text>`;
+  svg.innerHTML=s;
+  const doms=[...new Set(items.map(d=>d.domain))].sort();
+  $("#legend").innerHTML=doms.map(d=>`<span><i class="dotc" style="background:${DOMAIN_COLORS[d]}"></i>${d}</span>`).join("");
+}
+
+function drawBars(items){
+  const top=[...items].sort((a,b)=>(b.raw?.stars||0)-(a.raw?.stars||0)).slice(0,10);
+  const max=Math.max(...top.map(d=>d.raw?.stars||0),1);
+  $("#bars").innerHTML=top.map(d=>`
+    <div class="bar">
+      <span class="nm" title="${d.name}">${d.name.split("/").pop()}</span>
+      <span class="track"><span class="fill" style="width:${((d.raw?.stars||0)/max*100).toFixed(1)}%"></span></span>
+      <span class="val">${fmtStars(d.raw?.stars)}★</span>
+    </div>`).join("") || `<div class="hint">No data</div>`;
+}
+
+function rollup(items){
+  const m={}; items.forEach(d=>{const k=d.primary_model||"unspecified"; m[k]=(m[k]||0)+1;});
+  const top=Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  $("#rollup").innerHTML="Top substrates: "+top.map(([k,v])=>`<span class="pill">${k} ·${v}</span>`).join(" ");
+}
+
+function sortItems(items){
+  const k=$("#sort").value;
+  return [...items].sort((a,b)=> k==="stars" ? (b.raw?.stars||0)-(a.raw?.stars||0) : (b[k]-a[k]));
+}
+
+function card(d){
+  const stars=fmtStars(d.raw?.stars);
+  const tags=[d.domain,d.deployment,d.build_complexity].filter(Boolean);
+  return `<div class="proj ${d.opportunity_gap?'gap':''}" data-name="${d.name}">
+    <div class="top">
+      <div><div class="name">${d.name.split("/").pop()}</div><div class="who">${d.creator||d.name.split("/")[0]} · ${d.origin_country||"unknown"}</div></div>
+      <div class="radar">${d.radar_score}<small>RADAR</small></div>
+    </div>
+    <div class="one">${d.one_liner||""}</div>
+    <div class="tags">${tags.map((t,i)=>`<span class="tag ${i===0?'dom':''}">${t}</span>`).join("")}${d.opportunity_gap?'<span class="gapflag">◆ gap</span>':''}</div>
+    <div class="sub3">
+      <div class="s"><div class="n">${d.popularity}</div><div class="l">Pop</div></div>
+      <div class="s"><div class="n">${d.momentum}</div><div class="l">Mom</div></div>
+      <div class="s"><div class="n">${d.reusability}</div><div class="l">Reuse</div></div>
+    </div>
+    <div class="foot"><span class="stars">★ ${stars}</span><span class="pill">${d.license||"?"}</span></div>
+  </div>`;
+}
+
+function render(){
+  let items=filtered(); items=sortItems(items);
+  $("#shown").textContent=items.length;
+  $("#grid").innerHTML=items.map(card).join("");
+  $("#empty").style.display=items.length?"none":"block";
+  $("#barTitle").textContent=`Most-starred (${items.length} shown)`;
+  drawScatter(items); drawBars(items); rollup(items);
+  document.querySelectorAll(".proj").forEach(el=>el.onclick=()=>openPanel(el.dataset.name));
+}
+
+function openPanel(name){
+  const d=DATA.find(x=>x.name===name); if(!d) return;
+  const kv=(t,v)=> v==null||v===""?"":`<dt>${t}</dt><dd>${v}</dd>`;
+  $("#panel").innerHTML=`
+    <span class="x" onclick="closePanel()">✕</span>
+    <h2>${d.name.split("/").pop()}</h2>
+    <div class="pwho"><a href="${d.url}" target="_blank" rel="noopener">${d.name} ↗</a> · ${d.creator||""} (${d.creator_type||"?"}) · ${d.origin_country||"unknown"}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+      <span class="pill" style="color:var(--gap)">★ ${fmtStars(d.raw?.stars)}</span>
+      <span class="pill">Radar ${d.radar_score}</span>
+      <span class="pill">active ${relTime ? (d.raw?.pushed_days_ago!=null? d.raw.pushed_days_ago+'d ago':'?') : ''}</span>
+      ${d.opportunity_gap?'<span class="pill" style="color:var(--gap);border-color:#3a2f17">◆ opportunity gap</span>':''}
+      ${d.raw?.stale?'<span class="pill err">stale stats</span>':''}
+    </div>
+    <p class="note">${d.one_liner||""}</p>
+    <div class="sketch"><span class="k">⚒ How you'd rebuild it</span>${d.rebuild_sketch||"—"}</div>
+    <div class="sketch" style="border-left-color:var(--acc2)"><span class="k" style="color:var(--acc2)">♻ Reuse note</span>${d.reuse_note||"—"}</div>
+    <dl class="kv">
+      ${kv("Industry",d.industry)}${kv("Domain",d.domain)}${kv("Function",d.function)}${kv("Purpose",d.purpose)}
+      ${kv("Primary model",d.primary_model)}${kv("Base models",(d.base_models||[]).join(", "))}
+      ${kv("Build effort",`${d.build_complexity} — ${d.complexity_reason||""}`)}
+      ${kv("Deployment",d.deployment)}${kv("Maturity",`${d.maturity} — ${d.maturity_reason||""}`)}
+      ${kv("In production",d.in_production?(d.production_evidence||"yes"):"not confirmed")}
+      ${kv("Token cost",`${d.token_tier} — ${d.token_note||""}`)}
+      ${kv("License",d.license)}${kv("Commercial use",d.commercial_ok?"OK":"restricted")}
+      ${kv("Business model",d.business_model)}${kv("Compliance",d.compliance_flag||"none noted")}
+      ${kv("Sources",(d.source||[]).join(", "))}
+    </dl>
+    <div class="note">Scores — popularity ${d.popularity}, momentum ${d.momentum}, reusability ${d.reusability}. ${d.momentum_unrefined?"Momentum is proxy-based.":""}</div>
+  `;
+  $("#panel").classList.add("show"); $("#scrim").classList.add("show");
+}
+function closePanel(){ $("#panel").classList.remove("show"); $("#scrim").classList.remove("show"); }
+
+function load(data, live){
+  DATA=data.items; META=data.meta||{};
+  assignColors(); buildFilters();
+  $("#ts").textContent=relTime(META.generated);
+  $("#ts").title=META.generated||"";
+  $("#count").textContent=`${DATA.length} projects scored`;
+  const b=$("#livebadge");
+  if(live){ b.textContent="live"; b.className="badge live"; }
+  else { b.textContent="snapshot"; b.className="badge snap"; }
+  render();
+}
+
+async function refresh(force){
+  const btn=$("#refreshBtn"), ic=$("#refIcon");
+  btn.disabled=true; ic.textContent="⟲"; ic.style.display="inline-block";
+  const spin=ic.animate?ic.animate([{transform:"rotate(0)"},{transform:"rotate(360deg)"}],{duration:800,iterations:Infinity}):null;
+  try{
+    const r=await fetch("/api/projects"+(force?"?force=1":""),{cache:"no-store"});
+    if(!r.ok) throw new Error("http "+r.status);
+    const j=await r.json();
+    load(j, j.meta&&j.meta.live);
+  }catch(e){
+    if(force){ $("#count").innerHTML='<span class="err">Live refresh needs the deployed API (run on Cloudflare).</span>'; }
+    if(!DATA.length) load(SNAPSHOT,false);
+  }finally{
+    spin&&spin.cancel(); ic.textContent="⟳"; btn.disabled=false;
+  }
+}
+
+// wire up
+$("#q").oninput=render;
+$("#sort").onchange=render;
+$("#rel").oninput=()=>{ $("#relv").textContent=$("#rel").value; render(); };
+$("#tw").onchange=render;
+$("#gapToggle").onclick=()=>{ gapOnly=!gapOnly; $("#gapToggle").classList.toggle("on",gapOnly); render(); };
+$("#moreBtn").onclick=()=>{ const f=$("#filters"); f.classList.toggle("show"); $("#moreBtn").textContent=f.classList.contains("show")?"Fewer filters ▴":"More filters ▾"; };
+$("#refreshBtn").onclick=()=>refresh(true);
+$("#scrim").onclick=closePanel;
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closePanel(); });
+
+// initial: try live API, fall back to embedded snapshot
+load(SNAPSHOT,false);
+refresh(false);
+</script>
+</body>
+</html>

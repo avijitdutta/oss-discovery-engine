@@ -1,0 +1,17 @@
+name = "oss-discovery-engine"
+compatibility_date = "2024-11-01"
+pages_build_output_dir = "."
+
+# --- OPTIONAL: caching (do this AFTER your first successful deploy) ---
+# KV caches the scored payload + last-refresh timestamp so visits don't
+# re-hit GitHub. The app works without it (it just refreshes live each load).
+# To enable: create the namespace, paste its id below, then UNCOMMENT this block:
+#   npx wrangler kv namespace create RADAR_KV
+#
+# [[kv_namespaces]]
+# binding = "RADAR_KV"
+# id = "PASTE_KV_NAMESPACE_ID_HERE"
+
+# Optional but recommended for production: a GitHub token lifts the API limit
+# from 60/hr to 5000/hr. Set it as a SECRET, never commit it:
+#   npx wrangler pages secret put GITHUB_TOKEN
