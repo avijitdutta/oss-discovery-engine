@@ -2,7 +2,7 @@
 
 A discovery engine for fantastic projects built on **open / open-weight AI models**. Each project is scored for **reuse, momentum, and rebuild difficulty**, and shown with live GitHub stars, interactive filters, charts, and a "how you'd rebuild it" sketch.
 
-Deploys to **Cloudflare Pages** as a static front-end plus one cached API function.
+Deploys as a **Cloudflare Worker with static assets** — a static front-end plus one cached API route, connected to GitHub so every push auto-deploys.
 
 ---
 
@@ -10,45 +10,54 @@ Deploys to **Cloudflare Pages** as a static front-end plus one cached API functi
 
 ```
 oss-discovery-engine/
-├── index.html                 # the app (self-contained; embeds a snapshot fallback)
-├── functions/api/projects.js  # Cloudflare Pages Function — cached live-refresh API
-├── data.json                  # the curated dataset (also embedded in index.html)
-├── wrangler.toml              # Pages + KV config
+├── public/
+│   ├── index.html      # the app (self-contained; embeds a snapshot fallback)
+│   └── data.json       # the curated dataset (also embedded in index.html)
+├── src/index.js        # the Worker: serves /api/projects + falls back to static assets
+├── wrangler.toml       # Worker + assets config (KV optional)
 └── README.md
 ```
 
 ## How it works
 
-- **Open it offline** — double-click `index.html`. It runs entirely client-side on the embedded snapshot: search, filters, relevance slider, time window, charts, detail panels. The badge reads `snapshot`.
-- **Deployed on Cloudflare** — the app calls `/api/projects` on load. The function returns a **server-cached** payload (KV, up to 6h old) to keep load and GitHub rate-limit usage low. The badge reads `live` and shows the last-refresh time.
+- **Open it offline** — double-click `public/index.html`. It runs entirely client-side on the embedded snapshot: search, filters, relevance slider, time window, charts, detail panels. The badge reads `snapshot`.
+- **Deployed on Cloudflare** — the app calls `/api/projects` on load. The Worker returns a **server-cached** payload (KV, up to 6h old) to keep load and GitHub rate-limit usage low. The badge reads `live` and shows the last-refresh time.
 - **Refresh data button** — calls `/api/projects?force=1`, which re-fetches current GitHub stats for every project, **recomputes the Radar scores**, caches the result with a fresh timestamp, and updates the view. The hand-written qualitative analysis (rebuild sketch, complexity, etc.) is preserved — only the numbers move.
 
-## Deploy (public)
+## Deploy (via GitHub → Cloudflare)
 
-1. Install the CLI and log in:
-   ```bash
-   npm i -g wrangler
-   wrangler login
-   ```
-2. Create the cache namespace and paste its id into `wrangler.toml`:
-   ```bash
-   wrangler kv namespace create RADAR_KV
-   ```
-3. (Recommended) add a GitHub token so refreshes don't hit the 60/hr anon limit:
-   ```bash
-   wrangler pages secret put GITHUB_TOKEN
-   ```
-4. Deploy:
-   ```bash
-   wrangler pages deploy .
-   ```
-   You'll get a public `*.pages.dev` URL. Add a custom domain in the Cloudflare dashboard if you like.
+The repo is connected to a Cloudflare Worker with **Deploy command: `npx wrangler deploy`**. Just push:
 
-Local dev: `wrangler pages dev .`
+```bash
+git add -A && git commit -m "Workers + static assets" && git push
+```
+
+Cloudflare auto-builds on every push (or click **Retry build**). You'll get a `*.workers.dev` URL.
+
+CLI alternative (no GitHub): `npm i -g wrangler && wrangler login && npx wrangler deploy`.
+Local dev: `npx wrangler dev`.
+
+## Enable caching (optional, after first deploy)
+
+```bash
+npx wrangler kv namespace create RADAR_KV
+```
+
+Uncomment the `[[kv_namespaces]]` block in `wrangler.toml`, paste the id, and push. (The KV id is an identifier, not a secret — safe to commit.)
+
+## Higher GitHub rate limit (optional)
+
+Anonymous GitHub allows 60 calls/hr; a token raises it to 5,000/hr:
+
+```bash
+npx wrangler secret put GITHUB_TOKEN
+```
+
+(Create a fine-grained token at github.com/settings/tokens — no scopes needed for public data.)
 
 ## Make it private
 
-Cloudflare **Pages → your project → Settings → Access policy** (or **Zero Trust → Access → Applications**): add an Access policy that allows only your email / Google / GitHub identity. The site then sits behind a login wall while staying on the same URL — no code changes.
+**Zero Trust → Access → Applications** → add a self-hosted app pointing at your Worker URL, with a policy allowing only your email. The site then sits behind a login wall, same URL, no code change.
 
 ## Merit vs. the static dashboard
 

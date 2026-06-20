@@ -1,4 +1,4 @@
-// Cloudflare Pages Function — GET /api/projects
+// Cloudflare Worker (static assets + API) — GET /api/projects
 // Returns the discovery dataset. Serves a KV-cached copy to reduce load;
 // refreshes live GitHub stats when the cache is stale or ?force=1 is passed.
 //
@@ -110,39 +110,46 @@ function payload(items, ts, live, stale) {
   };
 }
 
-export async function onRequest(context) {
-  const { request, env } = context;
-  const url = new URL(request.url);
-  const force = url.searchParams.get("force") === "1";
-  const kv = env.RADAR_KV;
-  const token = env.GITHUB_TOKEN;
-  const json = (obj) => new Response(JSON.stringify(obj), {
-    headers: { "content-type": "application/json", "cache-control": "no-store", "access-control-allow-origin": "*" },
-  });
 
-  // try cache first (unless forced)
-  if (kv && !force) {
-    try {
-      const cached = await kv.get(KV_KEY, "json");
-      if (cached && cached.meta && cached.meta.generated) {
-        const fresh = Date.now() - new Date(cached.meta.generated).getTime() < TTL_MS;
-        if (fresh) return json(cached);
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+
+    if (url.pathname === "/api/projects") {
+      const force = url.searchParams.get("force") === "1";
+      const kv = env.RADAR_KV;
+      const token = env.GITHUB_TOKEN;
+      const json = (obj) => new Response(JSON.stringify(obj), {
+        headers: { "content-type": "application/json", "cache-control": "no-store", "access-control-allow-origin": "*" },
+      });
+
+      // serve cache first (unless forced)
+      if (kv && !force) {
+        try {
+          const cached = await kv.get(KV_KEY, "json");
+          if (cached && cached.meta && cached.meta.generated) {
+            const fresh = Date.now() - new Date(cached.meta.generated).getTime() < TTL_MS;
+            if (fresh) return json(cached);
+          }
+        } catch (e) { /* fall through */ }
       }
-    } catch (e) { /* fall through to refresh */ }
-  }
 
-  // refresh live; on any failure, serve last cache, then bundled snapshot
-  try {
-    const { items, ok, total } = await refresh(token);
-    // only claim "live" if at least one repo actually refreshed
-    const out = payload(items, new Date().toISOString(), ok > 0, total - ok);
-    if (kv && ok > 0) context.waitUntil(kv.put(KV_KEY, JSON.stringify(out)));
-    if (ok === 0) throw new Error("all GitHub fetches failed");
-    return json(out);
-  } catch (e) {
-    if (kv) {
-      try { const cached = await kv.get(KV_KEY, "json"); if (cached) return json(cached); } catch (_) {}
+      // refresh live; on failure serve last cache, then bundled snapshot
+      try {
+        const { items, ok, total } = await refresh(token);
+        const out = payload(items, new Date().toISOString(), ok > 0, total - ok);
+        if (kv && ok > 0) ctx.waitUntil(kv.put(KV_KEY, JSON.stringify(out)));
+        if (ok === 0) throw new Error("all GitHub fetches failed");
+        return json(out);
+      } catch (e) {
+        if (kv) {
+          try { const cached = await kv.get(KV_KEY, "json"); if (cached) return json(cached); } catch (_) {}
+        }
+        return json(payload(score(JSON.parse(JSON.stringify(BASE))), new Date().toISOString(), false, BASE.length));
+      }
     }
-    return json(payload(score(JSON.parse(JSON.stringify(BASE))), new Date().toISOString(), false, BASE.length));
+
+    // everything else -> static assets (index.html, data.json, etc.)
+    return env.ASSETS.fetch(request);
   }
-}
+};
